@@ -1,8 +1,7 @@
-package players.oep;
+package players.ai;
 
 import core.actions.Action;
 import core.game.GameState;
-
 import java.util.ArrayList;
 
 public class Individual implements Comparable<Individual>{

@@ -1,4 +1,4 @@
-package players.oep;
+package players.ai;
 
 import core.Types;
 import core.actions.Action;
@@ -12,16 +12,15 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Random;
 import players.Agent;
-import players.ai.Individual;
 import players.heuristics.StateHeuristic;
 import utils.ElapsedCpuTimer;
 
 
-public class OEPAgent extends Agent {
+public class AIAgent extends Agent {
 
     private Random m_rnd;
     private StateHeuristic heuristic;
-    private OEPParams params;
+    private AIParams params;
 
     private Individual bestIndividual;
     private int fmCallsCount;
@@ -29,7 +28,7 @@ public class OEPAgent extends Agent {
     private GameState root;
 
 
-    public OEPAgent(long seed, OEPParams params) {
+    public AIAgent(long seed, AIParams params) {
         super(seed);
         m_rnd = new Random(seed);
         this.params = params;

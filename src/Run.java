@@ -2,6 +2,8 @@ import core.Types;
 import core.game.Game;
 import org.json.JSONArray;
 import players.*;
+import players.ai.AIAgent;
+import players.ai.AIParams;
 import gui.GUI;
 import gui.WindowInput;
 import players.emcts.EMCTSAgent;
@@ -25,6 +27,8 @@ import players.rhea.RHEAParams;
 import static core.Constants.*;
 import static core.Types.TRIBE.*;
 import static core.Types.TRIBE.OUMAJI;
+import players.test.testAgent;
+import players.test.testParams;
 
 class Run {
 
@@ -70,7 +74,10 @@ class Run {
         RHEA,
         OEP,
         EMCTS,
-        PORTFOLIO_MCTS
+        PORTFOLIO_MCTS,
+        TEST,
+        AI,
+        SOCKET
     }
 
     public static double K_INIT_MULT = 0.5;
@@ -102,6 +109,9 @@ class Run {
             case "OEP": return Run.PlayerType.OEP;
             case "pMCTS": return Run.PlayerType.PORTFOLIO_MCTS;
             case "EMCTS": return Run.PlayerType.EMCTS;
+            case "test": return Run.PlayerType.TEST;
+            case "ai" : return Run.PlayerType.AI;
+            case "socket" : return Run.PlayerType.SOCKET;
         }
         throw new Exception("Error: unrecognized Player Type: " + arg);
     }
@@ -201,6 +211,13 @@ class Run {
                 rheaParams.FORCE_TURN_END = rheaParams.INDIVIDUAL_LENGTH + 1;
                 rheaParams.POP_SIZE = POP_SIZE;
                 return new RHEAAgent(agentSeed, rheaParams);
+            case TEST:
+                testParams testparams = new testParams();
+                testparams.stop_type = testparams.STOP_FMCALLS;
+                testparams.heuristic_method = testparams.DIFF_HEURISTIC;
+                return new testAgent(agentSeed, testparams);
+            case SOCKET:
+                return new SocketAgent(agentSeed,"localhost",5000);
         }
         return null;
     }

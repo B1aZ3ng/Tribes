@@ -35,13 +35,14 @@ public class LevelGenerator {
     //JSON that contains all the probability values for all the tribes.
     private JSONObject data;
 
-    private boolean LEVELGEN_VERBOSE = false;
+    private boolean LEVELGEN_VERBOSE = true;
+    private boolean LEVELGEN_FLAT = true;
 
     /**
      * Constructor of the generator
      */
     public LevelGenerator(long seed) {
-
+        
         this.seed = seed;
         this.rnd = new Random(seed);
 
@@ -75,8 +76,148 @@ public class LevelGenerator {
     /**
      * Generates the level.
      */
-    public void generate() {
+    public void generateFlat() {
 
+    if (LEVELGEN_VERBOSE) System.out.println("Generating FLAT level with seed: " + this.seed);
+
+    // Fill the entire map with plains right away (no water at all)
+    for (int i = 0; i < mapSize * mapSize; i++) {
+        writeTile(i, "" + PLAIN.getMapChar(), null);
+    }
+
+    // Capital distribution
+    if (LEVELGEN_VERBOSE) System.out.println("Capital distribution");
+    ArrayList<Integer> capitalCells = new ArrayList<>();
+    HashMap<Integer, Integer> capitalMap = new HashMap<>();
+
+    for (Types.TRIBE tribe : tribes) {
+        for (int row = 2; row < mapSize - 2; row++) {
+            for (int column = 2; column < mapSize - 2; column++) {
+                if (getTerrain(row * mapSize + column) == PLAIN.getMapChar()) {
+                    capitalMap.put(row * mapSize + column, 0);
+                }
+            }
+        }
+    }
+
+    for (Types.TRIBE tribe : tribes) {
+        int max = 0;
+        Iterator capitalIterator = capitalMap.entrySet().iterator();
+        while (capitalIterator.hasNext()) {
+            Map.Entry cell = (Map.Entry)capitalIterator.next();
+            cell.setValue(mapSize);
+            for (int capital_cell : capitalCells) {
+                cell.setValue(Math.min((int)cell.getValue(), distance((int)cell.getKey(), capital_cell, mapSize)));
+            }
+            max = Math.max(max, (int)cell.getValue());
+        }
+
+        int len = 0;
+        capitalIterator = capitalMap.entrySet().iterator();
+        while (capitalIterator.hasNext()) {
+            Map.Entry cell = (Map.Entry)capitalIterator.next();
+            if ((int)cell.getValue() == max) len++;
+        }
+
+        int randCell = randomInt(0, len);
+        capitalIterator = capitalMap.entrySet().iterator();
+        while (capitalIterator.hasNext()) {
+            Map.Entry cell = (Map.Entry) capitalIterator.next();
+            if ((int)cell.getValue() == max) {
+                if (randCell == 0) {
+                    capitalCells.add((int)cell.getKey());
+                }
+                randCell--;
+            }
+        }
+    }
+
+    for (int i = 0; i < capitalCells.size(); i++) {
+        writeTile(capitalCells.get(i), ""+CITY.getMapChar(), String.valueOf(tribes[i].getKey()));
+    }
+
+    // Expand territory from capitals (all land, so simple expansion)
+    ArrayList<Integer> doneTiles = new ArrayList<>();
+    ArrayList<ArrayList<Integer>> activeTiles = new ArrayList<>();
+    Types.TRIBE[] tileOwner = new Types.TRIBE[mapSize * mapSize];
+
+    for (int i = 0; i < capitalCells.size(); i++) {
+        doneTiles.add(capitalCells.get(i));
+        ArrayList<Integer> cap = new ArrayList<>();
+        cap.add(capitalCells.get(i));
+        activeTiles.add(cap);
+    }
+
+    while (doneTiles.size() != mapSize * mapSize) {
+        for (int i = 0; i < tribes.length; i++) {
+            if (activeTiles.get(i).size() != 0) {
+                int randNumber = randomInt(0, activeTiles.get(i).size());
+                int randCell = activeTiles.get(i).get(randNumber);
+
+                ArrayList<Integer> neighbours = circle(randCell, 1);
+                ArrayList<Integer> validNeighbours = new ArrayList<>();
+                for (int n : neighbours) {
+                    if (!doneTiles.contains(n)) validNeighbours.add(n);
+                }
+
+                if (validNeighbours.size() != 0) {
+                    int new_rand_cell = validNeighbours.get(randomInt(0, validNeighbours.size()));
+                    tileOwner[new_rand_cell] = tribes[i];
+                    activeTiles.get(i).add(new_rand_cell);
+                    doneTiles.add(new_rand_cell);
+                } else {
+                    activeTiles.get(i).remove(randNumber);
+                }
+            }
+        }
+    }
+
+    // Forest generation only (no mountains)
+    for (int cell = 0; cell < mapSize * mapSize; cell++) {
+        if (getTerrain(cell) == PLAIN.getMapChar()) {
+            double rand = rnd.nextDouble();
+            if (rand < getBaseProb("FOREST") * getTribeProb("FOREST", tileOwner[cell])) {
+                writeTile(cell, ""+FOREST.getMapChar(), null);
+            }
+        }
+    }
+
+    // Village placement (same as original but no water/mountain check needed)
+    ArrayList<Integer> villageMap = new ArrayList<>(Collections.nCopies(mapSize * mapSize, 0));
+    int villageCount = 0;
+    for (int capital : capitalCells) {
+        villageMap.set(capital, 3);
+        for (int cell : circle(capital, 1)) villageMap.set(cell, Math.max(villageMap.get(cell), 2));
+        for (int cell : circle(capital, 2)) villageMap.set(cell, Math.max(villageMap.get(cell), 1));
+    }
+
+    while (villageMap.contains(0)) {
+        int new_village = villageMap.indexOf(0);
+        villageMap.set(new_village, 3);
+        for (int cell : circle(new_village, 1)) villageMap.set(cell, Math.max(villageMap.get(cell), 2));
+        for (int cell : circle(new_village, 2)) villageMap.set(cell, Math.max(villageMap.get(cell), 1));
+    }
+
+    // Resources on land only (no water, no mountains)
+    for (int cell = 0; cell < mapSize * mapSize; cell++) {
+        if (getTerrain(cell) == PLAIN.getMapChar() || getTerrain(cell) == FOREST.getMapChar()) {
+            if (villageMap.get(cell) == 3) {
+                writeTile(cell, ""+VILLAGE.getMapChar(), null);
+            } else if (getTerrain(cell) == PLAIN.getMapChar() && rnd.nextDouble() < getBaseProb("CROPS")) {
+                writeTile(cell, null, ""+CROPS.getMapChar());
+            } else if (getTerrain(cell) == FOREST.getMapChar() && rnd.nextDouble() < getBaseProb("ANIMAL")) {
+                writeTile(cell, null, ""+ANIMAL.getMapChar());
+            }
+        }
+    }
+}
+
+
+    public void generate() {
+        if (LEVELGEN_FLAT) {
+            generateFlat();
+            return;
+        }
         if (LEVELGEN_VERBOSE) System.out.println("Generating level with seed: " + this.seed);
 
         //Randomly replace half of the tiles with ground.
